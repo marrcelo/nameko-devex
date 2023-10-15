@@ -30,14 +30,43 @@ def order_details(db_session, order):
 
 
 def test_get_order(orders_rpc, order):
-    response = orders_rpc.get_order(1)
+    response = orders_rpc.get(1)
     assert response['id'] == order.id
+
+
+def test_list_order(orders_rpc, order):
+    page = 1
+    limit = 5
+    response = orders_rpc.list(page, limit)
+
+    assert response['limit'] == limit
+    assert response['page'] == page
+    assert response['total'] == 1
+    assert response['total_pages'] == 1
+    assert response['has_next'] == False
+    assert response['data'][0]['id'] == order.id
+
+
+def test_list_order_invalid_page_query_param(orders_rpc):
+    page = 0
+    limit = 5
+    with pytest.raises(RemoteError) as err:
+        orders_rpc.list(page, limit)
+    assert err.value.value == 'Invalid request "page" should be greater or equal 1'
+
+
+def test_list_order_invalid_limit_query_param(orders_rpc):
+    page = 1
+    limit = 0
+    with pytest.raises(RemoteError) as err:
+        orders_rpc.list(page, limit)
+    assert err.value.value == 'Invalid request "limit" should be greater or equal 1'
 
 
 @pytest.mark.usefixtures('db_session')
 def test_will_raise_when_order_not_found(orders_rpc):
     with pytest.raises(RemoteError) as err:
-        orders_rpc.get_order(1)
+        orders_rpc.get(1)
     assert err.value.value == 'Order with id 1 not found'
 
 
@@ -55,7 +84,7 @@ def test_can_create_order(orders_service, orders_rpc):
             'quantity': 8
         }
     ]
-    new_order = orders_rpc.create_order(
+    new_order = orders_rpc.create(
         OrderDetailSchema(many=True).dump(order_details).data
     )
     assert new_order['id'] > 0
@@ -86,11 +115,11 @@ def test_can_update_order(orders_rpc, order):
     for order_detail in order_payload['order_details']:
         order_detail['quantity'] += 1
 
-    updated_order = orders_rpc.update_order(order_payload)
+    updated_order = orders_rpc.update(order_payload)
 
     assert updated_order['order_details'] == order_payload['order_details']
 
 
 def test_can_delete_order(orders_rpc, order, db_session):
-    orders_rpc.delete_order(order.id)
+    orders_rpc.delete(order.id)
     assert not db_session.query(Order).filter_by(id=order.id).count()
