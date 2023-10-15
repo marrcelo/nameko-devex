@@ -210,14 +210,7 @@ class TestCreateOrder(object):
                 'maximum_speed': 3,
                 'in_stock': 899,
                 'passenger_capacity': 100
-            },
-            {
-                'id': 'the_enigma',
-                'title': 'The Enigma',
-                'maximum_speed': 200,
-                'in_stock': 1,
-                'passenger_capacity': 4
-            },
+            }
         ]
 
         # setup mock create response
@@ -241,7 +234,8 @@ class TestCreateOrder(object):
         )
         assert response.status_code == 200
         assert response.json() == {'id': 11}
-        assert gateway_service.products_rpc.list.call_args_list == [call()]
+        assert gateway_service.products_rpc.list.call_args_list == [
+            call(['the_odyssey'])]
         assert gateway_service.orders_rpc.create_order.call_args_list == [
             call([
                 {'product_id': 'the_odyssey', 'quantity': 3, 'price': '41.00'}
