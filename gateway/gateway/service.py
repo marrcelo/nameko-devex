@@ -7,8 +7,8 @@ from nameko.rpc import RpcProxy
 from werkzeug import Response
 
 from gateway.entrypoints import http
-from gateway.exceptions import OrderNotFound, ProductNotFound
-from gateway.schemas import CreateOrderSchema, GetOrderSchema, ProductSchema
+from gateway.exceptions import OrderNotFound, ProductNotFound, OrderInvalidQueryParam
+from gateway.schemas import CreateOrderSchema, OrderSchema, ProductSchema
 
 
 class GatewayService(object):
@@ -87,7 +87,56 @@ class GatewayService(object):
             json.dumps({'id': product_data['id']}), mimetype='application/json'
         )
 
-    @http("GET", "/orders/<int:order_id>", expected_exceptions=OrderNotFound)
+    @http("GET", "/orders", expected_exceptions=(OrderNotFound, OrderInvalidQueryParam))
+    def get_orders(self, request):
+        """Gets the paginate orders details.
+
+        Enhances the order details with full product details from the
+        products-service.
+        """
+
+        limit = request.args.get('limit') or 5
+        page = request.args.get('page') or 1
+
+        orders = self._get_orders(int(page), int(limit))
+
+        return Response(
+            json.dumps(orders),
+            mimetype='application/json'
+        )
+
+    def _get_orders(self, page, limit):
+        # Retrieve order data from the orders service.
+        # Note - this may raise a remote exception that has been mapped to
+        # raise``OrderNotFound`` or raise``OrderInvalidQueryParam``
+
+        orders = self.orders_rpc.list(int(page), int(limit))
+
+        if len(orders['data']) == 0:
+            return orders
+
+        order_product_ids = list(
+            set([item['product_id'] for order in orders['data'] for item in order['order_details']]))
+
+        # Retrieve all order products from the products service
+        product_map = {
+            prod['id']: prod for prod in self.products_rpc.list(order_product_ids)}
+
+        # get the configured image root
+        image_root = config['PRODUCT_IMAGE_ROOT']
+
+        # Enhance order details with product and image details.
+        for order in orders['data']:
+            for item in order['order_details']:
+                product_id = item['product_id']
+
+                item['product'] = product_map[product_id]
+                # Construct an image url.
+                item['image'] = '{}/{}.jpg'.format(image_root, product_id)
+
+        return orders
+
+    @http("GET", "/orders/<int:order_id>", expected_exceptions=(OrderNotFound, OrderInvalidQueryParam))
     def get_order(self, request, order_id):
         """Gets the order details for the order given by `order_id`.
 
@@ -96,7 +145,7 @@ class GatewayService(object):
         """
         order = self._get_order(order_id)
         return Response(
-            GetOrderSchema().dumps(order).data,
+            OrderSchema().dumps(order).data,
             mimetype='application/json'
         )
 
@@ -104,7 +153,7 @@ class GatewayService(object):
         # Retrieve order data from the orders service.
         # Note - this may raise a remote exception that has been mapped to
         # raise``OrderNotFound``
-        order = self.orders_rpc.get_order(order_id)
+        order = self.orders_rpc.get(order_id)
 
         order_product_ids = list(
             set(item['product_id'] for item in order['order_details']))
@@ -195,7 +244,7 @@ class GatewayService(object):
         # Dump the data through the schema to ensure the values are serialized
         # correctly.
         serialized_data = CreateOrderSchema().dump(order_data).data
-        result = self.orders_rpc.create_order(
+        result = self.orders_rpc.create(
             serialized_data['order_details']
         )
         return result['id']

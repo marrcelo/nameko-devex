@@ -25,6 +25,16 @@ class OrderNotFound(Exception):
     pass
 
 
+@remote_error('orders.exceptions.InvalidQueryParam')
+class OrderInvalidQueryParam(Exception):
+    """
+    If the orders service raises a ``InvalidQueryParam`` error from an RPC call,
+    The ``RemoteError`` will be transformed and raised locally as this
+    exception instead.
+    """
+    pass
+
+
 @remote_error('products.exceptions.NotFound')
 class ProductNotFound(Exception):
     pass
