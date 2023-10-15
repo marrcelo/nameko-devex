@@ -19,13 +19,26 @@ def test_get_fails_on_not_found(storage):
     assert 'Product ID 2 does not exist' == exc.value.args[0]
 
 
-def test_get(storage, products):
+def test_get(storage):
     product = storage.get('LZ129')
     assert 'LZ129' == product['id']
     assert 'LZ 129 Hindenburg' == product['title']
     assert 135 == product['maximum_speed']
     assert 50 == product['passenger_capacity']
     assert 11 == product['in_stock']
+
+
+def test_delete_fails_on_not_found(storage):
+    with pytest.raises(storage.NotFound) as exc:
+        storage.delete(2)
+    assert 'Product ID 2 does not exist' == exc.value.args[0]
+
+
+def test_delete(storage):
+    storage.delete('LZ130')
+    with pytest.raises(storage.NotFound) as exc:
+        storage.delete('LZ130')
+    assert 'Product ID LZ130 does not exist' == exc.value.args[0]
 
 
 def test_list(storage, products):
