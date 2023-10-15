@@ -19,7 +19,14 @@ def test_get_fails_on_not_found(storage):
     assert 'Product ID 2 does not exist' == exc.value.args[0]
 
 
-def test_get(storage):
+def test_get(storage, create_product):
+
+    create_product(id='LZ129',
+                   title='LZ 129 Hindenburg',
+                   passenger_capacity=50,
+                   maximum_speed=135,
+                   in_stock=11)
+
     product = storage.get('LZ129')
     assert 'LZ129' == product['id']
     assert 'LZ 129 Hindenburg' == product['title']
@@ -34,17 +41,47 @@ def test_delete_fails_on_not_found(storage):
     assert 'Product ID 2 does not exist' == exc.value.args[0]
 
 
-def test_delete(storage):
-    storage.delete('LZ130')
+def test_delete(storage, create_product):
+    create_product(id='LZ129',
+                   title='LZ 129 Hindenburg',
+                   passenger_capacity=50,
+                   maximum_speed=135,
+                   in_stock=11)
+
+    storage.delete('LZ129')
     with pytest.raises(storage.NotFound) as exc:
-        storage.delete('LZ130')
-    assert 'Product ID LZ130 does not exist' == exc.value.args[0]
+        storage.delete('LZ129')
+    assert 'Product ID LZ129 does not exist' == exc.value.args[0]
 
 
 def test_list(storage, products):
     listed_products = storage.list()
     assert (
         products == sorted(list(listed_products), key=lambda x: x['id']))
+
+
+def test_list_product_ids(storage, create_product):
+    create_product(
+        id='LZ127',
+        title='LZ 127 Graf Zeppelin',
+        passenger_capacity=20,
+        maximum_speed=128,
+        in_stock=10,
+    )
+    create_product(
+        id='LZ129',
+        title='LZ 129 Hindenburg',
+        passenger_capacity=50,
+        maximum_speed=135,
+        in_stock=11,
+    )
+
+    product_ids = ['LZ127', 'LZ127', 'LZ129']
+    unique_product_ids = list(set(product_ids))
+
+    listed_products = storage.list(product_ids)
+
+    assert (len(list(listed_products)) == len(unique_product_ids))
 
 
 def test_create(product, redis_client, storage):

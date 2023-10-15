@@ -27,7 +27,10 @@ class StorageWrapper:
     def _format_key(self, product_id):
         return 'products:{}'.format(product_id)
 
-    def _from_hash(self, document):
+    def _from_hash(self, document, product_id):
+        if not document:
+            raise NotFound('Product ID {} does not exist'.format(product_id))
+
         return {
             'id': document[b'id'].decode('utf-8'),
             'title': document[b'title'].decode('utf-8'),
@@ -38,15 +41,17 @@ class StorageWrapper:
 
     def get(self, product_id):
         product = self.client.hgetall(self._format_key(product_id))
-        if not product:
-            raise NotFound('Product ID {} does not exist'.format(product_id))
-        else:
-            return self._from_hash(product)
+        return self._from_hash(product, product_id)
 
-    def list(self):
-        keys = self.client.keys(self._format_key('*'))
+    def list(self, product_ids=None):
+
+        if product_ids:
+            product_ids = list(set(product_ids))
+            keys = [self._format_key(product_id) for product_id in product_ids]
+        else:
+            keys = self.client.keys(self._format_key('*'))
         for key in keys:
-            yield self._from_hash(self.client.hgetall(key))
+            yield self._from_hash(self.client.hgetall(key), key)
 
     def create(self, product):
         self.client.hmset(
